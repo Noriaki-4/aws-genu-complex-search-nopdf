@@ -10,8 +10,9 @@ that injected context back.
 import json
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 class AuthContextMissingError(Exception):
@@ -60,12 +61,17 @@ def load_auth_context() -> AuthContext:
 
 
 def today_iso() -> str:
-    """Return the current UTC date as an ISO 8601 date string (YYYY-MM-DD).
+    """Return the current business date as an ISO 8601 date string (YYYY-MM-DD).
 
     Phase 2 always uses the Runtime's current date for effective-date
     checks; user-requested as-of dates are not honored (see Phase 2 plan).
     """
-    return datetime.now(timezone.utc).date().isoformat()
+    timezone_name = os.environ.get("AGENTIC_RESEARCH_BUSINESS_TIMEZONE", "Asia/Tokyo")
+    try:
+        business_timezone = ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        business_timezone = UTC
+    return datetime.now(business_timezone).date().isoformat()
 
 
 def is_active_and_effective(metadata: dict, as_of_date: str) -> bool:
@@ -102,10 +108,16 @@ def is_authorized(auth: AuthContext, metadata: dict) -> bool:
 
 
 def get_session_store_dir() -> Path:
-    """Return (creating if needed) this session's scoped store directory."""
+    """Return (creating if needed) this session's scoped store directory.
+
+    The default base dir intentionally lives outside /tmp/ws because the
+    workspace is removed after each request. The store is not explicitly
+    garbage-collected here; AgentCore session microVM teardown is expected to
+    reclaim it after the session lifetime.
+    """
     session_id = os.environ.get("SESSION_ID", "no-session")
     base_dir = os.environ.get(
-        "RESEARCH_SESSION_STORE_DIR", "/tmp/ws/agentic-research-session"
+        "RESEARCH_SESSION_STORE_DIR", "/tmp/agentic-research-session"
     )
     store_dir = Path(base_dir) / session_id
     store_dir.mkdir(parents=True, exist_ok=True)

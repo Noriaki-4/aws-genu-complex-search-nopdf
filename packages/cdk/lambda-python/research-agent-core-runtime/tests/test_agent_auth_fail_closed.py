@@ -82,3 +82,4 @@ async def test_agentic_research_injects_auth_context_into_business_servers(
             "allowedConfidentialityLevels": [],
         }
         assert env["SESSION_ID"] == "session-xyz"
+        assert env["AGENTIC_RESEARCH_BUSINESS_TIMEZONE"] == "Asia/Tokyo"

@@ -70,11 +70,14 @@ def search_knowledge_base(query: str, top_k: int = 10) -> dict:
     as_of_date = today_iso()
     bounded_top_k = max(1, min(top_k, 50))
 
-    retrieval_filter: dict = {"andAll": [{"equals": {"key": "status", "value": "active"}}]}
+    filter_conditions = [{"equals": {"key": "status", "value": "active"}}]
     if auth.org_code:
-        retrieval_filter["andAll"].append(
-            {"equals": {"key": "org_code", "value": auth.org_code}}
-        )
+        filter_conditions.append({"equals": {"key": "org_code", "value": auth.org_code}})
+    retrieval_filter: dict = (
+        filter_conditions[0]
+        if len(filter_conditions) == 1
+        else {"andAll": filter_conditions}
+    )
 
     try:
         response = _bedrock_agent_runtime_client().retrieve(

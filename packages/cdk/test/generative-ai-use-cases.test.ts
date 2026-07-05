@@ -1,4 +1,4 @@
-import { Template } from 'aws-cdk-lib/assertions';
+import { Match, Template } from 'aws-cdk-lib/assertions';
 import * as cdk from 'aws-cdk-lib';
 import {
   processedStackInputSchema,
@@ -229,6 +229,50 @@ describe('GenerativeAiUseCases', () => {
         },
       });
     }
+  });
+
+  test('research agent core uses existing rag knowledge base in model region', () => {
+    const app = new cdk.App({
+      context: appContext,
+    });
+
+    const params = processedStackInputSchema.parse({
+      ...stackInput,
+      agentEnabled: false,
+      createGenericAgentCoreRuntime: false,
+      agentBuilderEnabled: false,
+      guardrailEnabled: false,
+      dashboard: false,
+      researchAgentEnabled: true,
+      ragKnowledgeBaseEnabled: true,
+      ragKnowledgeBaseId: 'existing-kb-id',
+      modelRegion: 'ap-northeast-1',
+      agentCoreRegion: 'us-west-2',
+    });
+
+    createStacks(app, params);
+    const researchAgentCoreStack = app.node.findChild(
+      `ResearchAgentCoreStack${params.env}`
+    ) as cdk.Stack;
+    const template = Template.fromStack(researchAgentCoreStack);
+
+    template.hasResourceProperties('AWS::BedrockAgentCore::Runtime', {
+      EnvironmentVariables: Match.objectLike({
+        KNOWLEDGE_BASE_ID: 'existing-kb-id',
+        MODEL_REGION: 'ap-northeast-1',
+      }),
+    });
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: 'bedrock:Retrieve',
+            Resource:
+              'arn:aws:bedrock:ap-northeast-1:123456890123:knowledge-base/existing-kb-id',
+          }),
+        ]),
+      },
+    });
   });
 
   test('matches the snapshot (AgentCore with VPC)', () => {

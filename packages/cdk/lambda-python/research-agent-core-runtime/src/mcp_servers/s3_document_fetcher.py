@@ -13,6 +13,7 @@ from mcp.server.fastmcp import FastMCP
 
 from src.mcp_servers.common import (
     AuthContextMissingError,
+    append_retrieved_results,
     is_active_and_effective,
     is_authorized,
     load_auth_context,
@@ -34,6 +35,16 @@ def _s3_client():
     return _client
 
 
+def _normalize_allowed_prefix(prefix: str) -> str | None:
+    """Normalize configured S3 prefix to a directory boundary."""
+    normalized_prefix = os.path.normpath(prefix.strip("/"))
+    if normalized_prefix in (".", ""):
+        return ""
+    if normalized_prefix.startswith("..") or normalized_prefix.startswith("/"):
+        return None
+    return f"{normalized_prefix.rstrip('/')}/"
+
+
 def _resolve_allowed_key(source_s3_uri: str) -> tuple[str, str] | None:
     """Validate a s3:// URI against the allow-listed bucket/prefix.
 
@@ -42,8 +53,12 @@ def _resolve_allowed_key(source_s3_uri: str) -> tuple[str, str] | None:
     prefix.
     """
     allowed_bucket = os.environ.get("AGENTIC_RESEARCH_DOCUMENT_BUCKET_NAME")
-    allowed_prefix = os.environ.get("AGENTIC_RESEARCH_DOCUMENT_PREFIX", "")
+    allowed_prefix = _normalize_allowed_prefix(
+        os.environ.get("AGENTIC_RESEARCH_DOCUMENT_PREFIX", "")
+    )
     if not allowed_bucket:
+        return None
+    if allowed_prefix is None:
         return None
 
     if not source_s3_uri.startswith("s3://"):
@@ -106,9 +121,9 @@ def fetch_document(source_s3_uri: str) -> dict:
     if not is_authorized(auth, metadata):
         return {"error": "document is not authorized for this user"}
 
+    document_id = f"s3://{bucket}/{key}"
     content = response["Body"].read().decode("utf-8", errors="replace")
-
-    return {
+    result = {
         "documentId": f"s3://{bucket}/{key}",
         "content": content,
         "metadata": {
@@ -116,6 +131,18 @@ def fetch_document(source_s3_uri: str) -> dict:
             "status": metadata["status"],
         },
     }
+    append_retrieved_results(
+        [
+            {
+                "sourceType": "s3-document-fetcher",
+                "documentId": document_id,
+                "content": content,
+                "metadata": metadata,
+                "citation": {"sourceS3Uri": document_id},
+            }
+        ]
+    )
+    return result
 
 
 if __name__ == "__main__":

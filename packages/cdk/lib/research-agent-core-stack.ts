@@ -11,6 +11,7 @@ export interface ResearchAgentCoreStackProps extends StackProps {
   // agenticResearchKnowledgeBaseId / agenticResearchDocumentBucketName are
   // not explicitly configured.
   readonly ragKnowledgeBaseId?: string;
+  readonly ragKnowledgeBaseRegion?: string;
   readonly ragDataSourceBucketName?: string;
 }
 
@@ -38,6 +39,7 @@ export class ResearchAgentCoreStack extends Stack {
           gatewayArns: params.agentCoreGatewayArns ?? undefined,
           agenticResearchKnowledgeBaseId:
             params.agenticResearchKnowledgeBaseId ?? props.ragKnowledgeBaseId,
+          agenticResearchKnowledgeBaseRegion: props.ragKnowledgeBaseRegion,
           agenticResearchDocumentBucketName:
             params.agenticResearchDocumentBucketName ??
             props.ragDataSourceBucketName,

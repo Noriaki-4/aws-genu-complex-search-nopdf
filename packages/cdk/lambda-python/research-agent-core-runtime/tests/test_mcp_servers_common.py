@@ -18,6 +18,7 @@ from src.mcp_servers.common import (
     is_authorized,
     load_auth_context,
     load_retrieved_results,
+    today_iso,
 )
 
 
@@ -87,6 +88,10 @@ class TestIsActiveAndEffective:
     def test_no_effective_dates_defaults_to_accepted(self):
         metadata = {"status": "active"}
         assert is_active_and_effective(metadata, "2026-07-06") is True
+
+    def test_today_iso_uses_configured_business_timezone(self, monkeypatch):
+        monkeypatch.setenv("AGENTIC_RESEARCH_BUSINESS_TIMEZONE", "Asia/Tokyo")
+        assert len(today_iso()) == len("2026-07-06")
 
 
 class TestIsAuthorized:

@@ -13,6 +13,7 @@ import os
 from src.agent import (
     AGENTIC_RESEARCH_ALLOWED_TOOLS,
     AGENTIC_RESEARCH_MCP_SERVERS,
+    KNOWN_RESEARCH_MODES,
     WEB_RESEARCH_ALLOWED_TOOLS,
     WEB_RESEARCH_MCP_SERVERS,
     AgentManager,
@@ -48,6 +49,15 @@ def test_agentic_research_allowed_tools_exclude_open_web_tools():
 
 def test_web_research_allowed_tools_include_web_fetch():
     assert "WebFetch" in WEB_RESEARCH_ALLOWED_TOOLS
+
+
+def test_known_research_modes_match_prompt_files():
+    prompt_modes = {
+        os.path.splitext(name)[0]
+        for name in os.listdir(os.path.join(os.path.dirname(__file__), "..", "prompts"))
+        if name.endswith(".md")
+    }
+    assert KNOWN_RESEARCH_MODES == prompt_modes
 
 
 class TestGetModeMcpServers:
@@ -88,6 +98,10 @@ class TestGetModeMcpServers:
     def test_non_agentic_mode_without_request_uses_full_web_set(self):
         result = self.manager.get_mode_mcp_servers("mini-research", None)
         assert result == WEB_RESEARCH_MCP_SERVERS
+
+    def test_unknown_mode_is_not_used_as_prompt_path(self):
+        prompt = self.manager.load_mode_prompt("../mcp-configs/mcp")
+        assert "技術調査" in prompt
 
 
 class TestGetModeAllowedTools:

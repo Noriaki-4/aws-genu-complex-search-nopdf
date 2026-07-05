@@ -109,3 +109,39 @@ class TestVerifyCitations:
 
         params = inspect.signature(verify_citations).parameters
         assert "contexts" not in params
+
+    def test_session_store_survives_workspace_cleanup_between_requests(
+        self, monkeypatch, tmp_path
+    ):
+        from src.mcp_servers.common import append_retrieved_results
+        from src.utils import clean_ws_directory
+
+        workspace_dir = tmp_path / "ws"
+        workspace_dir.mkdir()
+        (workspace_dir / "scratch.txt").write_text("temporary", encoding="utf-8")
+        monkeypatch.setattr("src.utils.WORKSPACE_DIR", str(workspace_dir))
+
+        store_dir = tmp_path / "agentic-research-session"
+        monkeypatch.setenv("RESEARCH_SESSION_STORE_DIR", str(store_dir))
+        append_retrieved_results(
+            [
+                {
+                    "chunkId": "doc-1-chunk-1",
+                    "content": "A手続きでは災害時に承認不要となる例外がある",
+                    "metadata": {"status": "active"},
+                }
+            ]
+        )
+
+        clean_ws_directory()
+        result = verify_citations(
+            [
+                {
+                    "text": "A手続きでは災害時に承認不要となる",
+                    "citationIds": ["doc-1-chunk-1"],
+                }
+            ]
+        )
+
+        assert not workspace_dir.exists()
+        assert result == {"verified": True, "issues": []}

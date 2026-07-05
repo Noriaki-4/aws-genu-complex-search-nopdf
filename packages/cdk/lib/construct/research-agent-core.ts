@@ -27,6 +27,7 @@ export interface ResearchAgentCoreProps {
   gatewayArns?: string[];
   // Agentic Research (Phase 2: governed business RAG for agentic-research mode)
   agenticResearchKnowledgeBaseId?: string;
+  agenticResearchKnowledgeBaseRegion?: string;
   agenticResearchDocumentBucketName?: string;
   agenticResearchDocumentPrefix?: string;
   agenticResearchCognitoUserPoolId?: string;
@@ -47,6 +48,7 @@ export class ResearchAgentCore extends Construct {
       tavilyApiKey = '',
       gatewayArns,
       agenticResearchKnowledgeBaseId,
+      agenticResearchKnowledgeBaseRegion,
       agenticResearchDocumentBucketName,
       agenticResearchDocumentPrefix = '',
       agenticResearchCognitoUserPoolId,
@@ -67,15 +69,21 @@ export class ResearchAgentCore extends Construct {
     // Configure role permissions
     this.configureRolePermissions(this._role, gatewayArns, {
       knowledgeBaseId: agenticResearchKnowledgeBaseId,
+      knowledgeBaseRegion: agenticResearchKnowledgeBaseRegion,
       documentBucketName: agenticResearchDocumentBucketName,
-      documentPrefix: agenticResearchDocumentPrefix,
+      documentPrefix: this.normalizeDocumentPrefix(
+        agenticResearchDocumentPrefix
+      ),
     });
 
     // Create runtime
     this._runtime = this.createRuntime(env, braveApiKey, tavilyApiKey, {
       knowledgeBaseId: agenticResearchKnowledgeBaseId,
+      knowledgeBaseRegion: agenticResearchKnowledgeBaseRegion,
       documentBucketName: agenticResearchDocumentBucketName,
-      documentPrefix: agenticResearchDocumentPrefix,
+      documentPrefix: this.normalizeDocumentPrefix(
+        agenticResearchDocumentPrefix
+      ),
       cognitoUserPoolId: agenticResearchCognitoUserPoolId,
       cognitoAppClientId: agenticResearchCognitoAppClientId,
     });
@@ -87,6 +95,7 @@ export class ResearchAgentCore extends Construct {
     propsTavilyApiKey: string,
     agenticResearch: {
       knowledgeBaseId?: string;
+      knowledgeBaseRegion?: string;
       documentBucketName?: string;
       documentPrefix?: string;
       cognitoUserPoolId?: string;
@@ -126,7 +135,8 @@ export class ResearchAgentCore extends Construct {
     if (agenticResearch.knowledgeBaseId) {
       environmentVariables.KNOWLEDGE_BASE_ID = agenticResearch.knowledgeBaseId;
     }
-    environmentVariables.MODEL_REGION = region;
+    environmentVariables.MODEL_REGION =
+      agenticResearch.knowledgeBaseRegion ?? region;
     if (agenticResearch.documentBucketName) {
       environmentVariables.AGENTIC_RESEARCH_DOCUMENT_BUCKET_NAME =
         agenticResearch.documentBucketName;
@@ -176,6 +186,7 @@ export class ResearchAgentCore extends Construct {
     gatewayArns?: string[],
     agenticResearch?: {
       knowledgeBaseId?: string;
+      knowledgeBaseRegion?: string;
       documentBucketName?: string;
       documentPrefix?: string;
     }
@@ -247,6 +258,7 @@ export class ResearchAgentCore extends Construct {
     // base and document bucket used by the business MCP servers.
     if (agenticResearch?.knowledgeBaseId) {
       const region = Stack.of(this).region;
+      const knowledgeBaseRegion = agenticResearch.knowledgeBaseRegion ?? region;
       const accountId = Stack.of(this).account;
       role.addToPolicy(
         new PolicyStatement({
@@ -254,7 +266,7 @@ export class ResearchAgentCore extends Construct {
           effect: Effect.ALLOW,
           actions: ['bedrock:Retrieve'],
           resources: [
-            `arn:aws:bedrock:${region}:${accountId}:knowledge-base/${agenticResearch.knowledgeBaseId}`,
+            `arn:aws:bedrock:${knowledgeBaseRegion}:${accountId}:knowledge-base/${agenticResearch.knowledgeBaseId}`,
           ],
         })
       );
@@ -284,6 +296,11 @@ export class ResearchAgentCore extends Construct {
         })
       );
     }
+  }
+
+  private normalizeDocumentPrefix(prefix?: string): string {
+    const trimmed = (prefix ?? '').replace(/^\/+/, '');
+    return trimmed && !trimmed.endsWith('/') ? `${trimmed}/` : trimmed;
   }
 
   // Public getters

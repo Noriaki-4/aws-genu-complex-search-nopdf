@@ -70,9 +70,16 @@ AGENTIC_RESEARCH_ALLOWED_TOOLS = [
     "TodoWrite",
 ]
 
+KNOWN_RESEARCH_MODES = {
+    "agentic-research",
+    "general-research",
+    "mini-research",
+    "technical-research",
+}
+
 # Directory business MCP servers use to share retrieved results within a
 # session, so Citation Verify never has to trust LLM-supplied context.
-RESEARCH_SESSION_STORE_DIR = "/tmp/ws/agentic-research-session"
+RESEARCH_SESSION_STORE_DIR = "/tmp/agentic-research-session"
 
 
 class IterationLimitExceededError(Exception):
@@ -104,9 +111,12 @@ class AgentManager:
 
     def load_mode_prompt(self, mode: str) -> str:
         """Load system prompt for specified mode"""
+        if mode not in KNOWN_RESEARCH_MODES:
+            logger.warning(f"Unknown research mode {mode}; using technical-research")
+            mode = "technical-research"
         prompt_path = os.path.join(os.path.dirname(__file__), "..", "prompts", f"{mode}.md")
         try:
-            with open(prompt_path, "r", encoding="utf-8") as f:
+            with open(prompt_path, encoding="utf-8") as f:
                 content = f.read()
                 logger.info(f"Loaded {mode} prompt: {len(content)} chars")
                 return content
@@ -163,7 +173,7 @@ class AgentManager:
 
             model_id, region = extract_model_info(model_info)
             # Load mode-specific system prompt
-            effective_mode = mode or 'technical-research'
+            effective_mode = mode if mode in KNOWN_RESEARCH_MODES else "technical-research"
             mode_system_prompt = self.load_mode_prompt(effective_mode)
             effective_mcp_servers = self.get_mode_mcp_servers(
                 effective_mode, mcp_servers
@@ -187,6 +197,9 @@ class AgentManager:
                         "RESEARCH_SESSION_STORE_DIR": RESEARCH_SESSION_STORE_DIR,
                         "KNOWLEDGE_BASE_ID": os.environ.get("KNOWLEDGE_BASE_ID", ""),
                         "MODEL_REGION": os.environ.get("MODEL_REGION", region),
+                        "AGENTIC_RESEARCH_BUSINESS_TIMEZONE": os.environ.get(
+                            "AGENTIC_RESEARCH_BUSINESS_TIMEZONE", "Asia/Tokyo"
+                        ),
                         "AGENTIC_RESEARCH_DOCUMENT_BUCKET_NAME": os.environ.get(
                             "AGENTIC_RESEARCH_DOCUMENT_BUCKET_NAME", ""
                         ),
@@ -201,13 +214,13 @@ class AgentManager:
             # Process messages and prompt
             processed_messages = process_messages(messages)
             processed_prompt = process_prompt(prompt)
-            
+
             # Combine conversation history
             if processed_messages:
                 full_prompt = f"{processed_messages}\n\nHuman: {processed_prompt}\nAssistant:"
             else:
                 full_prompt = processed_prompt
-            
+
             logger.info(f"Initial prompt: {len(full_prompt)} chars, {len(messages)} previous messages")
 
             logger.info(f"Using mode: {effective_mode}")
