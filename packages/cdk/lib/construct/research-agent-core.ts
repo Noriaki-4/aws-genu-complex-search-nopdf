@@ -25,6 +25,12 @@ export interface ResearchAgentCoreProps {
   braveApiKey?: string;
   tavilyApiKey?: string;
   gatewayArns?: string[];
+  // Agentic Research (Phase 2: governed business RAG for agentic-research mode)
+  agenticResearchKnowledgeBaseId?: string;
+  agenticResearchDocumentBucketName?: string;
+  agenticResearchDocumentPrefix?: string;
+  agenticResearchCognitoUserPoolId?: string;
+  agenticResearchCognitoAppClientId?: string;
 }
 
 export class ResearchAgentCore extends Construct {
@@ -35,7 +41,17 @@ export class ResearchAgentCore extends Construct {
   constructor(scope: Construct, id: string, props: ResearchAgentCoreProps) {
     super(scope, id);
 
-    const { env, braveApiKey = '', tavilyApiKey = '', gatewayArns } = props;
+    const {
+      env,
+      braveApiKey = '',
+      tavilyApiKey = '',
+      gatewayArns,
+      agenticResearchKnowledgeBaseId,
+      agenticResearchDocumentBucketName,
+      agenticResearchDocumentPrefix = '',
+      agenticResearchCognitoUserPoolId,
+      agenticResearchCognitoAppClientId,
+    } = props;
 
     // Create bucket
     this._fileBucket = new Bucket(this, 'ResearchAgentFileBucket', {
@@ -49,16 +65,33 @@ export class ResearchAgentCore extends Construct {
     this._role = this.createExecutionRole();
 
     // Configure role permissions
-    this.configureRolePermissions(this._role, gatewayArns);
+    this.configureRolePermissions(this._role, gatewayArns, {
+      knowledgeBaseId: agenticResearchKnowledgeBaseId,
+      documentBucketName: agenticResearchDocumentBucketName,
+      documentPrefix: agenticResearchDocumentPrefix,
+    });
 
     // Create runtime
-    this._runtime = this.createRuntime(env, braveApiKey, tavilyApiKey);
+    this._runtime = this.createRuntime(env, braveApiKey, tavilyApiKey, {
+      knowledgeBaseId: agenticResearchKnowledgeBaseId,
+      documentBucketName: agenticResearchDocumentBucketName,
+      documentPrefix: agenticResearchDocumentPrefix,
+      cognitoUserPoolId: agenticResearchCognitoUserPoolId,
+      cognitoAppClientId: agenticResearchCognitoAppClientId,
+    });
   }
 
   private createRuntime(
     env: string,
     propsBraveApiKey: string,
-    propsTavilyApiKey: string
+    propsTavilyApiKey: string,
+    agenticResearch: {
+      knowledgeBaseId?: string;
+      documentBucketName?: string;
+      documentPrefix?: string;
+      cognitoUserPoolId?: string;
+      cognitoAppClientId?: string;
+    }
   ): Runtime {
     const region = Stack.of(this).region;
 
@@ -84,6 +117,30 @@ export class ResearchAgentCore extends Construct {
       '';
     if (tavilyApiKey) {
       environmentVariables.TAVILY_API_KEY = tavilyApiKey;
+    }
+
+    // Agentic Research (Phase 2): business MCP server config and Cognito
+    // verification settings. Business MCP servers receive these plus the
+    // Runtime-verified AUTH_CONTEXT_JSON out-of-band; the agent never
+    // supplies them through tool input.
+    if (agenticResearch.knowledgeBaseId) {
+      environmentVariables.KNOWLEDGE_BASE_ID = agenticResearch.knowledgeBaseId;
+    }
+    environmentVariables.MODEL_REGION = region;
+    if (agenticResearch.documentBucketName) {
+      environmentVariables.AGENTIC_RESEARCH_DOCUMENT_BUCKET_NAME =
+        agenticResearch.documentBucketName;
+    }
+    environmentVariables.AGENTIC_RESEARCH_DOCUMENT_PREFIX =
+      agenticResearch.documentPrefix ?? '';
+    if (agenticResearch.cognitoUserPoolId) {
+      environmentVariables.AGENTIC_RESEARCH_COGNITO_USER_POOL_ID =
+        agenticResearch.cognitoUserPoolId;
+      environmentVariables.AGENTIC_RESEARCH_COGNITO_REGION = region;
+    }
+    if (agenticResearch.cognitoAppClientId) {
+      environmentVariables.AGENTIC_RESEARCH_COGNITO_APP_CLIENT_ID =
+        agenticResearch.cognitoAppClientId;
     }
 
     return new Runtime(this, 'ResearchAgentCoreRuntime', {
@@ -114,7 +171,15 @@ export class ResearchAgentCore extends Construct {
     });
   }
 
-  private configureRolePermissions(role: Role, gatewayArns?: string[]): void {
+  private configureRolePermissions(
+    role: Role,
+    gatewayArns?: string[],
+    agenticResearch?: {
+      knowledgeBaseId?: string;
+      documentBucketName?: string;
+      documentPrefix?: string;
+    }
+  ): void {
     // Bedrock permissions
     role.addToPolicy(
       new PolicyStatement({
@@ -177,6 +242,48 @@ export class ResearchAgentCore extends Construct {
     );
 
     this._fileBucket.grantWrite(role);
+
+    // Agentic Research (Phase 2): scoped access to the governed knowledge
+    // base and document bucket used by the business MCP servers.
+    if (agenticResearch?.knowledgeBaseId) {
+      const region = Stack.of(this).region;
+      const accountId = Stack.of(this).account;
+      role.addToPolicy(
+        new PolicyStatement({
+          sid: 'AgenticResearchKnowledgeBaseRetrieve',
+          effect: Effect.ALLOW,
+          actions: ['bedrock:Retrieve'],
+          resources: [
+            `arn:aws:bedrock:${region}:${accountId}:knowledge-base/${agenticResearch.knowledgeBaseId}`,
+          ],
+        })
+      );
+    }
+
+    if (agenticResearch?.documentBucketName) {
+      const prefix = agenticResearch.documentPrefix ?? '';
+      role.addToPolicy(
+        new PolicyStatement({
+          sid: 'AgenticResearchDocumentBucketRead',
+          effect: Effect.ALLOW,
+          actions: ['s3:GetObject'],
+          resources: [
+            `arn:aws:s3:::${agenticResearch.documentBucketName}/${prefix}*`,
+          ],
+        })
+      );
+      role.addToPolicy(
+        new PolicyStatement({
+          sid: 'AgenticResearchDocumentBucketList',
+          effect: Effect.ALLOW,
+          actions: ['s3:ListBucket'],
+          resources: [`arn:aws:s3:::${agenticResearch.documentBucketName}`],
+          conditions: prefix
+            ? { StringLike: { 's3:prefix': `${prefix}*` } }
+            : undefined,
+        })
+      );
+    }
   }
 
   // Public getters

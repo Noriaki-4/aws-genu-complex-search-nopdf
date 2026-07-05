@@ -44,6 +44,54 @@
         "category": "Search",
         "description": "Additional web search and research capabilities powered by Tavily"
       }
+    },
+    "knowledge-base-retriever": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "/var/task",
+        "python",
+        "-m",
+        "src.mcp_servers.knowledge_base_retriever"
+      ],
+      "env": {},
+      "metadata": {
+        "category": "Business RAG",
+        "description": "Governed Bedrock Knowledge Base retrieval for agentic-research mode. Only reachable in agentic-research mode."
+      }
+    },
+    "s3-document-fetcher": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "/var/task",
+        "python",
+        "-m",
+        "src.mcp_servers.s3_document_fetcher"
+      ],
+      "env": {},
+      "metadata": {
+        "category": "Business RAG",
+        "description": "Fetches governed business documents from an allow-listed S3 bucket/prefix. Only reachable in agentic-research mode."
+      }
+    },
+    "citation-verifier": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "/var/task",
+        "python",
+        "-m",
+        "src.mcp_servers.citation_verifier"
+      ],
+      "env": {},
+      "metadata": {
+        "category": "Business RAG",
+        "description": "Verifies LLM citations against session-scoped retrieved context. Only reachable in agentic-research mode."
+      }
     }
   }
 }

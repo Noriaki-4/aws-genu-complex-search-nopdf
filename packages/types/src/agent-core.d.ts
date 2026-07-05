@@ -1,4 +1,5 @@
 import { Model } from './message';
+import { ResearchAgentMode } from './agent-builder';
 
 export type AgentCoreConfiguration = {
   name: string;
@@ -9,9 +10,13 @@ export type AgentCoreConfiguration = {
 
 // AgentCore Runtime Request (extended from Strands with additional fields)
 export type AgentCoreRequest = StrandsRequest & {
+  mode?: ResearchAgentMode;
   mcp_servers?: string[]; // Changed to string array
   session_id?: string;
   code_execution_enabled?: boolean;
+  // Verified Cognito ID token for agentic-research mode. The Runtime verifies
+  // this against Cognito JWKS; never trust client-supplied auth claims instead.
+  id_token?: string;
 };
 
 export type AgentCoreStreamResponse = StrandsStreamEvent;

@@ -162,6 +162,7 @@ const useAgentCoreApi = (id: string) => {
               'us.anthropic.claude-3-5-sonnet-20241022-v2:0',
             region: req.model.region || modelRegion,
           },
+          ...(req.mode && { mode: req.mode }),
           ...(req.userId && { user_id: req.userId }),
           ...(req.mcpServers && { mcp_servers: req.mcpServers }),
           ...(req.agentId && { agent_id: req.agentId }),
@@ -169,11 +170,23 @@ const useAgentCoreApi = (id: string) => {
           ...(req.codeExecutionEnabled !== undefined && {
             code_execution_enabled: req.codeExecutionEnabled,
           }),
+          // The Runtime verifies this token against Cognito JWKS; the client
+          // never sends auth claims (org, groups, confidentiality) directly.
+          ...(req.mode === 'agentic-research' && { id_token: token }),
         };
 
+        // Never log id_token: it is a bearer credential the Runtime uses to
+        // derive the caller's authorization context.
         console.log(
           'AgentCoreRequest payload:',
-          JSON.stringify(agentCoreRequest, null, 2)
+          JSON.stringify(
+            {
+              ...agentCoreRequest,
+              ...(agentCoreRequest.id_token && { id_token: '[REDACTED]' }),
+            },
+            null,
+            2
+          )
         );
 
         const commandInput: InvokeAgentRuntimeCommandInput = {

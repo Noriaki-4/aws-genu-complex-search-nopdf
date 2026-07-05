@@ -172,6 +172,12 @@ const baseStackInputSchema = z.object({
   createResearchAgentFargate: z.boolean().default(false),
   researchAgentBraveApiKey: z.string().default(''),
   researchAgentTavilyApiKey: z.string().default(''),
+  // Agentic Research (Phase 2: governed business RAG for agentic-research mode)
+  agenticResearchKnowledgeBaseId: z.string().nullish(),
+  agenticResearchDocumentBucketName: z.string().nullish(),
+  agenticResearchDocumentPrefix: z.string().default(''),
+  agenticResearchCognitoUserPoolId: z.string().nullish(),
+  agenticResearchCognitoAppClientId: z.string().nullish(),
   // MCP
   mcpEnabled: z.boolean().default(false),
   // Guardrail

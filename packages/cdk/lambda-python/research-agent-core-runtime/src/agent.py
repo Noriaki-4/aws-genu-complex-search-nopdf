@@ -6,6 +6,7 @@ import os
 from collections.abc import AsyncGenerator
 from typing import Any
 
+from src.auth import AgenticResearchAuthContext
 from src.config import extract_model_info, get_max_iterations
 from src.converters import ContentBlockConverter
 from src.tools import ToolManager
@@ -54,13 +55,24 @@ WEB_RESEARCH_ALLOWED_TOOLS = [
     "WebFetch",
 ]
 
-AGENTIC_RESEARCH_MCP_SERVERS: list[str] = []
+AGENTIC_RESEARCH_MCP_SERVERS = [
+    "knowledge-base-retriever",
+    "s3-document-fetcher",
+    "citation-verifier",
+]
 
 AGENTIC_RESEARCH_ALLOWED_TOOLS = [
-    # Business data MCP tools will be added here after their servers are implemented.
-    # Keep open web tools such as WebFetch, Brave, and Tavily unavailable in this mode.
+    # Business RAG MCP servers only. Open web tools such as WebFetch, Brave,
+    # and Tavily must never be reachable in this mode.
+    "mcp__knowledge-base-retriever__search_knowledge_base",
+    "mcp__s3-document-fetcher__fetch_document",
+    "mcp__citation-verifier__verify_citations",
     "TodoWrite",
 ]
+
+# Directory business MCP servers use to share retrieved results within a
+# session, so Citation Verify never has to trust LLM-supplied context.
+RESEARCH_SESSION_STORE_DIR = "/tmp/ws/agentic-research-session"
 
 
 class IterationLimitExceededError(Exception):
@@ -105,11 +117,16 @@ class AgentManager:
     def get_mode_mcp_servers(
         self, mode: str, requested_mcp_servers: list[str] | None
     ) -> list[str] | None:
-        """Return the MCP server set allowed for a research mode."""
+        """Return the MCP server set allowed for a research mode.
+
+        Non-agentic modes may narrow the server set via requested_mcp_servers,
+        but only within WEB_RESEARCH_MCP_SERVERS: a crafted request cannot
+        reach the business MCP servers reserved for agentic-research.
+        """
         if mode == "agentic-research":
             return AGENTIC_RESEARCH_MCP_SERVERS
         if requested_mcp_servers is not None:
-            return requested_mcp_servers
+            return [s for s in requested_mcp_servers if s in WEB_RESEARCH_MCP_SERVERS]
         return WEB_RESEARCH_MCP_SERVERS
 
     def get_mode_allowed_tools(self, mode: str) -> list[str]:
@@ -129,8 +146,15 @@ class AgentManager:
         mcp_servers: list[str] | None = None,
         session_id: str | None = None,
         agent_id: str | None = None,
+        auth_context: AgenticResearchAuthContext | None = None,
     ) -> AsyncGenerator[str]:
-        """Process a request and yield streaming responses"""
+        """Process a request and yield streaming responses.
+
+        auth_context must be set by the caller (app.py) whenever
+        mode == "agentic-research"; it is the only source of authorization
+        data business MCP servers receive, injected out-of-band into their
+        process environment rather than through LLM-controlled tool input.
+        """
         try:
             from claude_agent_sdk import ClaudeAgentOptions, query
 
@@ -148,6 +172,30 @@ class AgentManager:
             mcp_config = self.tool_manager.get_mcp_config(
                 mcp_servers=effective_mcp_servers
             )
+
+            if effective_mode == "agentic-research":
+                if auth_context is None:
+                    raise PermissionError(
+                        "agentic-research mode requires a verified auth_context"
+                    )
+                self.tool_manager.inject_business_context(
+                    mcp_config,
+                    AGENTIC_RESEARCH_MCP_SERVERS,
+                    {
+                        "AUTH_CONTEXT_JSON": auth_context.to_json(),
+                        "SESSION_ID": session_id or "no-session",
+                        "RESEARCH_SESSION_STORE_DIR": RESEARCH_SESSION_STORE_DIR,
+                        "KNOWLEDGE_BASE_ID": os.environ.get("KNOWLEDGE_BASE_ID", ""),
+                        "MODEL_REGION": os.environ.get("MODEL_REGION", region),
+                        "AGENTIC_RESEARCH_DOCUMENT_BUCKET_NAME": os.environ.get(
+                            "AGENTIC_RESEARCH_DOCUMENT_BUCKET_NAME", ""
+                        ),
+                        "AGENTIC_RESEARCH_DOCUMENT_PREFIX": os.environ.get(
+                            "AGENTIC_RESEARCH_DOCUMENT_PREFIX", ""
+                        ),
+                    },
+                )
+
             logger.info(f"Loaded {len(mcp_config)} MCP servers")
 
             # Process messages and prompt

@@ -7,6 +7,11 @@ import { REMOTE_OUTPUT_KEYS } from './remote-output-keys';
 
 export interface ResearchAgentCoreStackProps extends StackProps {
   readonly params: ProcessedStackInput;
+  // Fallback source for the governed knowledge base / document bucket when
+  // agenticResearchKnowledgeBaseId / agenticResearchDocumentBucketName are
+  // not explicitly configured.
+  readonly ragKnowledgeBaseId?: string;
+  readonly ragDataSourceBucketName?: string;
 }
 
 export class ResearchAgentCoreStack extends Stack {
@@ -31,6 +36,16 @@ export class ResearchAgentCoreStack extends Stack {
           braveApiKey: params.researchAgentBraveApiKey,
           tavilyApiKey: params.researchAgentTavilyApiKey,
           gatewayArns: params.agentCoreGatewayArns ?? undefined,
+          agenticResearchKnowledgeBaseId:
+            params.agenticResearchKnowledgeBaseId ?? props.ragKnowledgeBaseId,
+          agenticResearchDocumentBucketName:
+            params.agenticResearchDocumentBucketName ??
+            props.ragDataSourceBucketName,
+          agenticResearchDocumentPrefix: params.agenticResearchDocumentPrefix,
+          agenticResearchCognitoUserPoolId:
+            params.agenticResearchCognitoUserPoolId ?? undefined,
+          agenticResearchCognitoAppClientId:
+            params.agenticResearchCognitoAppClientId ?? undefined,
         }
       );
 

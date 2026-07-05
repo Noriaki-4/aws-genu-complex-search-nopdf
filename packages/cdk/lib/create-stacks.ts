@@ -125,6 +125,9 @@ export const createStacks = (app: cdk.App, params: ProcessedStackInput) => {
           region: params.agentCoreRegion,
         },
         params: params,
+        crossRegionReferences: true,
+        ragKnowledgeBaseId: ragKnowledgeBaseStack?.knowledgeBaseId,
+        ragDataSourceBucketName: ragKnowledgeBaseStack?.dataSourceBucketName,
       })
     : null;
 

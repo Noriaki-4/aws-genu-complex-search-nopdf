@@ -79,6 +79,24 @@ class ToolManager:
                 if isinstance(arg, str) and "tavilyApiKey=" in arg:
                     args[i] = arg.replace("tavilyApiKey=", f"tavilyApiKey={tavily_api_key}")
 
+    def inject_business_context(
+        self,
+        servers: Dict[str, Dict[str, Any]],
+        server_names: list[str],
+        env_vars: Dict[str, str],
+    ) -> None:
+        """Inject Runtime-verified context into business MCP servers' env.
+
+        This is the only channel business MCP servers receive authorization
+        context through (AUTH_CONTEXT_JSON, session info, data source
+        config). It is never taken from LLM-controlled tool input.
+        """
+        for name in server_names:
+            if name not in servers:
+                continue
+            env = servers[name].setdefault("env", {})
+            env.update(env_vars)
+
     def _get_default_mcp_config(self) -> Dict[str, Dict[str, Any]]:
         """Get default MCP server configuration"""
         config = {}

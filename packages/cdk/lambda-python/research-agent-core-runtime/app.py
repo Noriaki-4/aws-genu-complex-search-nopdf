@@ -5,10 +5,11 @@ import logging
 import traceback
 
 from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from src.agent import AgentManager
+from src.auth import AuthenticationError, verify_id_token
 from src.utils import clean_ws_directory, create_error_response, create_ws_directory
 
 # Configure root logger
@@ -80,12 +81,25 @@ async def invocations(request: Request):
         mcp_servers = request_data.get("mcp_servers")
         agent_session_id = request_data.get("session_id")
         agent_id = request_data.get("agent_id")
+        id_token = request_data.get("id_token")
 
         # Validate required fields
         if not model_info:
             return create_error_response("Model information is required")
         if not prompt and not messages:
             return create_error_response("Either prompt or messages is required")
+
+        # Fail fast: agentic-research must never start the agent loop
+        # without a Runtime-verified auth context. The client-declared
+        # id_token is verified here, before any streaming or tool use.
+        auth_context = None
+        if mode == "agentic-research":
+            try:
+                auth_context = verify_id_token(id_token)
+            except AuthenticationError as e:
+                logger.warning(f"agentic-research auth failed: {e}")
+                clean_ws_directory()
+                return create_error_response(f"Unauthorized: {e}")
 
         # Stream response
         async def generate():
@@ -100,6 +114,7 @@ async def invocations(request: Request):
                     mcp_servers=mcp_servers,
                     session_id=agent_session_id or session_id,
                     agent_id=agent_id,
+                    auth_context=auth_context,
                 ):
                     yield chunk
             finally:
