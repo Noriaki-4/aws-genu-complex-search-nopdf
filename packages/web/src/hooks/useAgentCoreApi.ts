@@ -14,6 +14,7 @@ import {
   UnrecordedMessage,
   StrandsContentBlock,
   AgentCoreRuntimeRequest,
+  ResearchAgentMode,
 } from 'generative-ai-use-cases';
 import {
   StrandsStreamProcessor,
@@ -27,6 +28,13 @@ const region = import.meta.env.VITE_APP_REGION as string;
 const modelRegion = import.meta.env.VITE_APP_MODEL_REGION as string;
 const identityPoolId = import.meta.env.VITE_APP_IDENTITY_POOL_ID as string;
 const userPoolId = import.meta.env.VITE_APP_USER_POOL_ID as string;
+
+const researchAgentModes: ResearchAgentMode[] = [
+  'technical-research',
+  'mini-research',
+  'general-research',
+  'agentic-research',
+];
 
 const useAgentCoreApi = (id: string) => {
   const {
@@ -92,10 +100,7 @@ const useAgentCoreApi = (id: string) => {
 
       // Check if this is a research agent request
       const isResearchAgent =
-        req.mode !== undefined &&
-        ['technical-research', 'mini-research', 'general-research'].includes(
-          req.mode
-        );
+        req.mode !== undefined && researchAgentModes.includes(req.mode);
 
       try {
         pushMessage('user', req.prompt);

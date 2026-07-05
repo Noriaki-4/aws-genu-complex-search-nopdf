@@ -5,6 +5,7 @@ import {
   AgentCoreConfiguration,
   AgentCoreRuntimeRequest,
   Model,
+  ResearchAgentMode,
 } from 'generative-ai-use-cases';
 
 // Get environment variables
@@ -36,7 +37,7 @@ export const useResearchAgent = (id: string) => {
   const invokeResearchAgent = useCallback(
     async (params: {
       agentRuntimeArn: string;
-      mode: 'technical-research' | 'mini-research' | 'general-research';
+      mode: ResearchAgentMode;
       prompt: string;
       model: Model;
       files?: File[];

@@ -172,13 +172,19 @@ export type AgentBuilderState = {
   error?: string;
 };
 
+export type ResearchAgentMode =
+  | 'technical-research'
+  | 'mini-research'
+  | 'general-research'
+  | 'agentic-research';
+
 // Agent Core Runtime Request Types
 export type AgentCoreRuntimeRequest = {
   agentRuntimeArn: string;
   sessionId?: string;
   qualifier?: string;
   system_prompt?: string; // Keep this name for backward compatibility with useAgentCore
-  mode?: 'technical-research' | 'mini-research' | 'general-research'; // Research agent mode
+  mode?: ResearchAgentMode; // Research agent mode
   prompt: string; // User prompt as string
   previousMessages?: UnrecordedMessage[]; // Raw messages that will be converted to Strands format
   model: Model;

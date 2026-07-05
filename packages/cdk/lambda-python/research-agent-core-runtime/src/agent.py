@@ -15,6 +15,53 @@ from src.utils import process_messages, process_prompt
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+WEB_RESEARCH_MCP_SERVERS = [
+    "brave-search",
+    "aws-knowledge-mcp-server",
+    "awslabs.aws-documentation-mcp-server",
+    "time-mcp-server",
+    "tavily-remote-mcp",
+]
+
+WEB_RESEARCH_ALLOWED_TOOLS = [
+    # Brave Search MCP server (single instance)
+    "mcp__brave-search__brave_web_search",
+    "mcp__brave-search__brave_local_search",
+    "mcp__brave-search__brave_video_search",
+    "mcp__brave-search__brave_image_search",
+    "mcp__brave-search__brave_news_search",
+    "mcp__brave-search__brave_summarizer",
+    # AWS Knowledge and Documentation servers
+    "mcp__aws-knowledge-mcp-server__aws___search_documentation",
+    "mcp__aws-knowledge-mcp-server__aws___read_documentation",
+    "mcp__aws-knowledge-mcp-server__aws___recommend",
+    "mcp__aws-knowledge-mcp-server__aws___get_regional_availability",
+    "mcp__aws-knowledge-mcp-server__aws___list_regions",
+    "mcp__awslabs.aws-documentation-mcp-server__search_documentation",
+    "mcp__awslabs.aws-documentation-mcp-server__get_documentation",
+    # Time server
+    "mcp__time-mcp-server__get_current_time",
+    "mcp__time-mcp-server__get_datetime",
+    "mcp__time-mcp-server__convert_time",
+    "mcp__time-mcp-server__get_current_unix_timestamp",
+    # Tavily search
+    "mcp__tavily-remote-mcp__tavily_search",
+    "mcp__tavily-remote-mcp__tavily_extract",
+    "mcp__tavily-remote-mcp__tavily_crawl",
+    # Built-in tools
+    "Task",
+    "TodoWrite",
+    "WebFetch",
+]
+
+AGENTIC_RESEARCH_MCP_SERVERS: list[str] = []
+
+AGENTIC_RESEARCH_ALLOWED_TOOLS = [
+    # Business data MCP tools will be added here after their servers are implemented.
+    # Keep open web tools such as WebFetch, Brave, and Tavily unavailable in this mode.
+    "TodoWrite",
+]
+
 
 class IterationLimitExceededError(Exception):
     """Exception raised when iteration limit is exceeded"""
@@ -55,6 +102,22 @@ class AgentManager:
             logger.error(f"Failed to load {mode} prompt: {e}")
             return "You are a helpful AWS technical assistant."
 
+    def get_mode_mcp_servers(
+        self, mode: str, requested_mcp_servers: list[str] | None
+    ) -> list[str] | None:
+        """Return the MCP server set allowed for a research mode."""
+        if mode == "agentic-research":
+            return AGENTIC_RESEARCH_MCP_SERVERS
+        if requested_mcp_servers is not None:
+            return requested_mcp_servers
+        return WEB_RESEARCH_MCP_SERVERS
+
+    def get_mode_allowed_tools(self, mode: str) -> list[str]:
+        """Return the tool allowlist for a research mode."""
+        if mode == "agentic-research":
+            return AGENTIC_RESEARCH_ALLOWED_TOOLS
+        return WEB_RESEARCH_ALLOWED_TOOLS
+
     async def process_request_streaming(
         self,
         messages: list[Message] | list[dict[str, Any]],
@@ -75,7 +138,16 @@ class AgentManager:
                 self.set_session_info(session_id, session_id)
 
             model_id, region = extract_model_info(model_info)
-            mcp_config = self.tool_manager.get_mcp_config(mcp_servers=mcp_servers)
+            # Load mode-specific system prompt
+            effective_mode = mode or 'technical-research'
+            mode_system_prompt = self.load_mode_prompt(effective_mode)
+            effective_mcp_servers = self.get_mode_mcp_servers(
+                effective_mode, mcp_servers
+            )
+            allowed_tools = self.get_mode_allowed_tools(effective_mode)
+            mcp_config = self.tool_manager.get_mcp_config(
+                mcp_servers=effective_mcp_servers
+            )
             logger.info(f"Loaded {len(mcp_config)} MCP servers")
 
             # Process messages and prompt
@@ -90,9 +162,6 @@ class AgentManager:
             
             logger.info(f"Initial prompt: {len(full_prompt)} chars, {len(messages)} previous messages")
 
-            # Load mode-specific system prompt
-            effective_mode = mode or 'technical-research'
-            mode_system_prompt = self.load_mode_prompt(effective_mode)
             logger.info(f"Using mode: {effective_mode}")
 
             # Create options
@@ -102,36 +171,7 @@ class AgentManager:
                 max_turns=200,
                 permission_mode="default",  # Use default mode - allows tool execution
                 mcp_servers=mcp_config,
-                allowed_tools=[
-                    # Brave Search MCP server (single instance)
-                    "mcp__brave-search__brave_web_search",
-                    "mcp__brave-search__brave_local_search",
-                    "mcp__brave-search__brave_video_search",
-                    "mcp__brave-search__brave_image_search",
-                    "mcp__brave-search__brave_news_search",
-                    "mcp__brave-search__brave_summarizer",
-                    # AWS Knowledge and Documentation servers
-                    "mcp__aws-knowledge-mcp-server__aws___search_documentation",
-                    "mcp__aws-knowledge-mcp-server__aws___read_documentation",
-                    "mcp__aws-knowledge-mcp-server__aws___recommend",
-                    "mcp__aws-knowledge-mcp-server__aws___get_regional_availability",
-                    "mcp__aws-knowledge-mcp-server__aws___list_regions",
-                    "mcp__awslabs.aws-documentation-mcp-server__search_documentation",
-                    "mcp__awslabs.aws-documentation-mcp-server__get_documentation",
-                    # Time server
-                    "mcp__time-mcp-server__get_current_time",
-                    "mcp__time-mcp-server__get_datetime",
-                    "mcp__time-mcp-server__convert_time",
-                    "mcp__time-mcp-server__get_current_unix_timestamp",
-                    # Tavily search - correct tool names
-                    "mcp__tavily-remote-mcp__tavily_search",
-                    "mcp__tavily-remote-mcp__tavily_extract",
-                    "mcp__tavily-remote-mcp__tavily_crawl",
-                    # Built-in tools
-                    "Task",
-                    "TodoWrite",
-                    "WebFetch",
-                ],
+                allowed_tools=allowed_tools,
             )
 
             converter = ContentBlockConverter()

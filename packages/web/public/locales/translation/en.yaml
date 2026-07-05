@@ -999,6 +999,8 @@ rag:
   retrieving: Retrieving reference documents from Kendra...
   title: RAG Chat
 research:
+  agentic_research: Agentic Research
+  agentic_research_desc: Searches governed business sources with agentic planning while avoiding open web tools
   description: Conducts various research tasks across industries using web search and creates detailed research reports.
   general_research: General Research
   general_research_desc: Researches information across a wide range of fields and provides comprehensive analysis

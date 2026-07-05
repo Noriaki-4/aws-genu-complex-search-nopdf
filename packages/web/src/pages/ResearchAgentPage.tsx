@@ -11,6 +11,7 @@ import useFiles from '../hooks/useFiles';
 import { useTranslation } from 'react-i18next';
 import { useResearchAgent } from '../hooks/useResearchAgent';
 import { MODELS } from '../hooks/useModel';
+import { ResearchAgentMode } from 'generative-ai-use-cases';
 
 // State management
 type StateType = {
@@ -87,10 +88,7 @@ const ResearchAgentPage: React.FC = () => {
         ? uploadedFileObjects.map((f) => f.file)
         : undefined;
 
-    const mode = (selectedMode || 'technical-research') as
-      | 'technical-research'
-      | 'mini-research'
-      | 'general-research';
+    const mode = (selectedMode || 'technical-research') as ResearchAgentMode;
     const model = {
       type: 'bedrock' as const,
       modelId: modelId,
@@ -196,6 +194,17 @@ const ResearchAgentPage: React.FC = () => {
                       : 'border-gray-300 hover:bg-gray-100'
                   }`}>
                   {t('research.general_research')}
+                </button>
+                <button
+                  onClick={() => setSelectedMode('agentic-research')}
+                  onMouseEnter={() => setHoveredMode('agentic-research')}
+                  onMouseLeave={() => setHoveredMode(null)}
+                  className={`rounded border px-4 py-2 text-sm transition-colors ${
+                    selectedMode === 'agentic-research'
+                      ? 'bg-aws-smile border-aws-smile text-white'
+                      : 'border-gray-300 hover:bg-gray-100'
+                  }`}>
+                  {t('research.agentic_research')}
                 </button>
                 {hoveredMode && (
                   <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 shadow-lg">

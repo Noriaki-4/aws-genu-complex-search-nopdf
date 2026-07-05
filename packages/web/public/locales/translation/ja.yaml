@@ -826,6 +826,8 @@ rag:
   retrieving: Kendra から参考ドキュメントを取得しています...
   title: RAG チャット
 research:
+  agentic_research: エージェンティック調査
+  agentic_research_desc: オープンWeb検索を使わず、管理された業務データソースを自律的に調査します
   description: 業種・業界問わず様々なリサーチタスクを Web 検索を駆使して実施し、詳細な調査レポートを作成します。
   general_research: 一般調査
   general_research_desc: 幅広い分野の情報を調査し、総合的な分析を提供します
