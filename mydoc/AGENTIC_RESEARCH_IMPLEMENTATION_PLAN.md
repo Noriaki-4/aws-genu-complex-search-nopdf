@@ -98,13 +98,13 @@ packages/types/src/agentic-research.d.ts
 主な型:
 
 ```ts
-AgenticResearchRequest
-AgenticResearchResponse
-ResearchStep
-ResearchTrace
-RetrieverResult
-Citation
-GraphPath
+AgenticResearchRequest;
+AgenticResearchResponse;
+ResearchStep;
+ResearchTrace;
+RetrieverResult;
+Citation;
+GraphPath;
 ```
 
 `AgenticResearchRequest` には、検索MCPサーバが強制フィルタに使う権限コンテキストを明示的に含める。
